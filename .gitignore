@@ -28,6 +28,7 @@ logs/
 cronlogs/
 config.yaml
 _ignore/
+temp_auto_push.bat
 app.env
 tmp/
 .idea/
@@ -58,3 +59,4 @@ telexbe
 telexbe_staging
 
 *.code-workspace
+branch_structure.json
