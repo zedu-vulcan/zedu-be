@@ -244,7 +244,7 @@ func TestCreditTopupWebhook_RejectsInvalidSignature(t *testing.T) {
 	db := storage.Connection()
 	validator := validator.New()
 
-	orgID := CreateOrganizationWithCredit(t, db.Postgresql, 100.00)
+	orgID := CreateOrganizationWithCredit(t, db.Postgresql, 0.00)
 	packageID := CreateTestCreditPackage(t, db.Postgresql, 1000, 5.00)
 	sessionID := fmt.Sprintf("cs_test_%s", utility.GenerateUUID())
 
