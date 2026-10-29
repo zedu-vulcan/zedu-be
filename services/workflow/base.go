@@ -56,6 +56,9 @@ func ListWorkflowsService(req models.WorkFlowRequest, db *gorm.DB) ([]models.Wor
 func DeleteWorkflowService(req models.WorkFlowRequest, db *gorm.DB) (int, error) {
 	err := models.DeleteWorkflow(db, req)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return http.StatusNotFound, errors.New("workflow not found in organisation")
+		}
 		return http.StatusInternalServerError, err
 	}
 	return http.StatusOK, nil
