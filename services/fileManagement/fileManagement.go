@@ -373,9 +373,6 @@ func DeleteFolder(db *gorm.DB, folderID string, userID string, orgID string, per
 	if permanent {
 		query = query.Unscoped()
 	}
-	if orgID != "" {
-		query = query.Where("organisation_id = ?", orgID)
-	}
 	err := query.Where("id = ?", folderID).First(&folder).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -384,7 +381,7 @@ func DeleteFolder(db *gorm.DB, folderID string, userID string, orgID string, per
 		return err
 	}
 
-	if userID != "" && folder.UserID != userID {
+	if (orgID != "" && folder.OrganisationID != orgID) || (userID != "" && folder.UserID != userID) {
 		return ErrFolderAccessDenied
 	}
 
