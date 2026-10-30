@@ -362,25 +362,66 @@ func GetFolders(db *gorm.DB, params models.GetFoldersParams) ([]models.Folder, p
 	return folders, paginationResponse, nil
 }
 
-func DeleteFolder(db *gorm.DB, folderID string, permanent bool) error {
+var (
+	ErrFolderNotFound     = errors.New("folder not found")
+	ErrFolderAccessDenied = errors.New("unauthorized to delete this folder")
+)
+
+func DeleteFolder(db *gorm.DB, folderID string, userID string, orgID string, permanent bool) error {
+	var folder models.Folder
+	query := db
+	if permanent {
+		query = query.Unscoped()
+	}
+	if orgID != "" {
+		query = query.Where("organisation_id = ?", orgID)
+	}
+	err := query.Where("id = ?", folderID).First(&folder).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrFolderNotFound
+		}
+		return err
+	}
+
+	if userID != "" && folder.UserID != userID {
+		return ErrFolderAccessDenied
+	}
+
 	if permanent {
 		// hard delete folder and its files
-		err := db.Unscoped().Where("id = ?", folderID).Delete(&models.Folder{}).Error
+		deleteFolderQuery := db.Unscoped()
+		if orgID != "" {
+			deleteFolderQuery = deleteFolderQuery.Where("organisation_id = ?", orgID)
+		}
+		err := deleteFolderQuery.Where("id = ?", folderID).Delete(&models.Folder{}).Error
 		if err != nil {
 			return err
 		}
 
-		return db.Unscoped().Where("folder_id = ?", folderID).Delete(&models.File{}).Error
+		deleteFileQuery := db.Unscoped()
+		if orgID != "" {
+			deleteFileQuery = deleteFileQuery.Where("organisation_id = ?", orgID)
+		}
+		return deleteFileQuery.Where("folder_id = ?", folderID).Delete(&models.File{}).Error
 	}
 
 	// soft delete folder
-	err := db.Where("id = ?", folderID).Delete(&models.Folder{}).Error
+	deleteFolderQuery := db
+	if orgID != "" {
+		deleteFolderQuery = deleteFolderQuery.Where("organisation_id = ?", orgID)
+	}
+	err = deleteFolderQuery.Where("id = ?", folderID).Delete(&models.Folder{}).Error
 	if err != nil {
 		return err
 	}
 
 	// soft delete the files in it too
-	return db.Where("folder_id = ?", folderID).Delete(&models.File{}).Error
+	deleteFileQuery := db
+	if orgID != "" {
+		deleteFileQuery = deleteFileQuery.Where("organisation_id = ?", orgID)
+	}
+	return deleteFileQuery.Where("folder_id = ?", folderID).Delete(&models.File{}).Error
 }
 
 func UpdateFolder(db *gorm.DB, params models.UpdateFolderParams) (*models.Folder, error) {
@@ -521,13 +562,13 @@ func DeleteMultipleFiles(logger *utility.Logger, db *storage.Database, fileIDs [
 	return successCount, failureCount, errs
 }
 
-func DeleteMultipleFolders(db *gorm.DB, folderIDs []string, permanent bool) (int, int, []error) {
+func DeleteMultipleFolders(db *gorm.DB, folderIDs []string, userID string, orgID string, permanent bool) (int, int, []error) {
 	successCount := 0
 	failureCount := 0
 	var errs []error
 
 	for _, folderID := range folderIDs {
-		err := DeleteFolder(db, folderID, permanent)
+		err := DeleteFolder(db, folderID, userID, orgID, permanent)
 		if err != nil {
 			failureCount++
 			errs = append(errs, fmt.Errorf("failed to delete folder %s: %v", folderID, err))
