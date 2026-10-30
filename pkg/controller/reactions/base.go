@@ -44,6 +44,8 @@ func (base *Controller) CreateReaction(c *gin.Context) {
 
 	claims, exists := c.Get("userClaims")
 	if !exists {
+		rd := utility.BuildErrorResponse(http.StatusUnauthorized, "error", "Unauthorized", "User not authenticated", nil)
+		c.JSON(http.StatusUnauthorized, rd)
 		return
 	}
 
