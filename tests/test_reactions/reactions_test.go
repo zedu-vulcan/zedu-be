@@ -65,7 +65,7 @@ func TestReactionNonMemberForbidden(t *testing.T) {
 	memberToken := tests.GetLoginToken(t, gin.Default(), authCtrl, memberLoginData)
 	nonMemberToken := tests.GetLoginToken(t, gin.Default(), authCtrl, nonMemberLoginData)
 
-	memberID := tests.GetUserIDFromToken(t, memberToken, db)
+	memberID := tests.GetUserIDFromToken(t, memberToken, reactionsController.Db)
 
 	// Create channel and assign only member to it
 	channel := models.Channels{
