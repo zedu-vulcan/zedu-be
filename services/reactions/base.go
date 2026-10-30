@@ -17,6 +17,11 @@ import (
 
 func CreateReaction(req models.ReactionRequest, db *storage.Database, logger *utility.Logger) (int, error) {
 
+	var uc models.UserChannels
+	if !postgresql.CheckExists(db.Postgresql, &uc, "channels_id = ? AND user_id = ?", req.ChannelsID, req.UserID) {
+		return http.StatusForbidden, errors.New("user is not a member of this channel")
+	}
+
 	react := models.Reaction{
 		ID:         utility.GenerateUUID(),
 		ChannelsID: req.ChannelsID,
