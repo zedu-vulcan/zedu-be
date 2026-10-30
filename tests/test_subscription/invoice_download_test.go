@@ -17,7 +17,7 @@ func TestDownloadInvoice_NonMemberForbidden(t *testing.T) {
 	_, orgIDA, _, _ := CreateUserWithOrganization(t, r, authController, db)
 
 	// User B with Org B
-	tokenB, _, _, _ := CreateUserWithOrganization(t, r, authController, db)
+	_, _, tokenB, _ := CreateUserWithOrganization(t, r, authController, db)
 
 	// User B attempts to download invoice for Org A
 	dummySessionID := fmt.Sprintf("cs_test_%s", utility.RandomString(24))
