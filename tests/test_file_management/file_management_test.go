@@ -425,6 +425,7 @@ func TestFileManagement(t *testing.T) {
 	})
 
 	var fileInFolderID string
+	var otherToken string
 
 	t.Run("DeleteFolder_Soft", func(t *testing.T) {
 
@@ -540,7 +541,7 @@ func TestFileManagement(t *testing.T) {
 
 		loginResp := tests.ParseResponse(rrLogin)
 		loginDataM := loginResp["data"].(map[string]interface{})
-		otherToken := loginDataM["access_token"].(string)
+		otherToken = loginDataM["access_token"].(string)
 
 		// Create folder with other user
 		reqBody := map[string]string{
@@ -621,6 +622,37 @@ func TestFileManagement(t *testing.T) {
 		if !foundMain {
 			t.Error("Expected main user's folder in mode=mine results")
 		}
+	})
+
+	t.Run("DeleteFolder_Forbidden_NonOwner", func(t *testing.T) {
+		reqBodyMain := map[string]string{
+			"name": "Owner Protected Folder",
+		}
+		var bMain bytes.Buffer
+		json.NewEncoder(&bMain).Encode(reqBodyMain)
+
+		reqMain, _ := http.NewRequest(http.MethodPost, "/api/v1/files/folders", &bMain)
+		reqMain.Header.Set("Content-Type", "application/json")
+		reqMain.Header.Set("Authorization", fmt.Sprintf("Bearer %v", token))
+
+		rrMain := httptest.NewRecorder()
+		r.ServeHTTP(rrMain, reqMain)
+		if rrMain.Code != http.StatusCreated {
+			t.Fatalf("Failed to create folder for main user: %s", rrMain.Body.String())
+		}
+
+		respMain := tests.ParseResponse(rrMain)
+		dataMain := respMain["data"].(map[string]interface{})
+		targetFolderID := dataMain["id"].(string)
+
+		// other user attempts to delete main user's folder
+		reqDel, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("/api/v1/files/folders/%s", targetFolderID), nil)
+		reqDel.Header.Set("Authorization", fmt.Sprintf("Bearer %v", otherToken))
+
+		rrDel := httptest.NewRecorder()
+		r.ServeHTTP(rrDel, reqDel)
+
+		tests.AssertStatusCode(t, rrDel.Code, http.StatusForbidden)
 	})
 
 	t.Run("GetFoldersModeTrash", func(t *testing.T) {

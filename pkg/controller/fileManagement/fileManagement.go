@@ -454,6 +454,13 @@ func (base *Controller) GetFolders(c *gin.Context) {
 }
 
 func (base *Controller) DeleteFolder(c *gin.Context) {
+	claims, exists := c.Get("userClaims")
+	if !exists {
+		rd := utility.BuildErrorResponse(http.StatusUnauthorized, "error", "Unauthorized", "User not authenticated", nil)
+		c.JSON(http.StatusUnauthorized, rd)
+		return
+	}
+
 	folderID := c.Param("id")
 	if !utility.IsValidUUID(folderID) {
 		rd := utility.BuildErrorResponse(http.StatusBadRequest, "error", "Invalid folder ID format", nil, nil)
@@ -462,8 +469,22 @@ func (base *Controller) DeleteFolder(c *gin.Context) {
 	}
 	permanent, _ := strconv.ParseBool(c.Query("permanent"))
 
-	err := services.DeleteFolder(base.Db.Postgresql, folderID, permanent)
+	userClaims := claims.(jwt.MapClaims)
+	userID, _ := userClaims["user_id"].(string)
+	orgID, _ := userClaims["org_id"].(string)
+
+	err := services.DeleteFolder(base.Db.Postgresql, folderID, userID, orgID, permanent)
 	if err != nil {
+		if errors.Is(err, services.ErrFolderNotFound) {
+			rd := utility.BuildErrorResponse(http.StatusNotFound, "error", "Folder not found", err.Error(), nil)
+			c.JSON(http.StatusNotFound, rd)
+			return
+		}
+		if errors.Is(err, services.ErrFolderAccessDenied) {
+			rd := utility.BuildErrorResponse(http.StatusForbidden, "error", "You do not have permission to delete this folder", err.Error(), nil)
+			c.JSON(http.StatusForbidden, rd)
+			return
+		}
 		rd := utility.BuildErrorResponse(http.StatusInternalServerError, "error", err.Error(), "Failed to delete folder", nil)
 		c.JSON(http.StatusInternalServerError, rd)
 		return
@@ -521,7 +542,15 @@ func (base *Controller) DeleteMultipleFolders(c *gin.Context) {
 		return
 	}
 
-	successCount, failureCount, errs := services.DeleteMultipleFolders(base.Db.Postgresql, req.IDs, req.Permanent)
+	var userID, orgID string
+	if claims, exists := c.Get("userClaims"); exists {
+		if userClaims, ok := claims.(jwt.MapClaims); ok {
+			userID, _ = userClaims["user_id"].(string)
+			orgID, _ = userClaims["org_id"].(string)
+		}
+	}
+
+	successCount, failureCount, errs := services.DeleteMultipleFolders(base.Db.Postgresql, req.IDs, userID, orgID, req.Permanent)
 
 	responseMsg := fmt.Sprintf("Bulk delete completed. Success: %d, Failed: %d", successCount, failureCount)
 	responseData := map[string]interface{}{
